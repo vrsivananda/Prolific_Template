@@ -48,7 +48,7 @@ for i = 1:numberOfSubjects
     fprintf('subject: %s\n',subjectId);
 
     % Make the SQL query to download everything.
-    sqlquery = ['SELECT * FROM ' tableName ' WHERE workerId = "' subjectId '"'];
+    sqlquery = ['SELECT * FROM ' tableName ' WHERE PROLIFIC_PID = "' subjectId '"'];
     
     % Change the path
     currentFolderPath = pwd;
