@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+  <head>
+      <title>Experiment</title> <!-- Change this if you'd like-->
+
+      <!--These are necessary for the template to work-->
+      <meta charset="UTF-8">
+      <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+      <link href="jspsych-6.0.5/css/jspsych.css" rel="stylesheet" type="text/css"></link>
+      <script src="jspsych-6.0.5/jspsych.js"></script>
+      <script src="jspsych-6.0.5/plugins/jspsych-call-function.js"></script>
+      <script src="jspsych-6.0.5/plugins/jspsych-external-html.js"></script>
+
+      <!-- jsPsych plugins specific to your experiment -->
+      <script src="jspsych-6.0.5/plugins/jspsych-survey-text.js"></script>
+  </head>
+  <body>
+  </body>
+  <script>
+
+        //Data switches
+        var saveLocally = 1;	// 0: Nothing.	1: Download CSV file
+        var displayData = 0;  // 0: Nothing.	1: Display data on browser
+        var launchOnline = 0;	// 0: Nothing.	1: Save to database, create consent form, completion code for Prolific
+        var tableName = 'Prolific_Testing'; //Name of the table in the database
+        var completionCode = "56FD5F89"; //Get this from Prolific when you are setting up the study there
+
+        //Get the IDs from the url
+        const urlParams = new URLSearchParams(window.location.search);
+        const PROLIFIC_PID = urlParams.get('PROLIFIC_PID');
+        const STUDY_ID = urlParams.get('STUDY_ID');
+        const SESSION_ID = urlParams.get('SESSION_ID');
+        const INTERNAL_ID = Date.now(); //This is just in case the above fails and/or we want to remove the Prolific IDs if we share the data
+
+        //Print out to console to check
+        console.log("PROLIFIC_PID: " + PROLIFIC_PID);
+        console.log("STUDY_ID: " + STUDY_ID);
+        console.log("SESSION_ID: " + SESSION_ID);
+        console.log("INTERNAL_ID: " + INTERNAL_ID);
+
+        var consentForm = "consentForm.html"; //Change this to your consent form if it is different from the default
+
+        //------------------- Your code below this line -------------------
+
+
+        // The experiment block
+        var survey_block = {
+            type: 'survey-text',
+            preamble: '<h2>Welcome to our survey!</h2> <br/> <h3>Please answer the 3 questions below to the best of your ability.</h3>',
+            questions: [
+                {
+                    prompt: 'What is your age?',
+                    columns: 3
+                },
+                {
+                    prompt: 'What is your ethnicity?',
+                    columns: 30
+                },
+                {
+                    prompt: 'In general, how fearful are you when talking about political issues? <br>0 = Not fearful at all<br>9 = I never talk about politics because of fear',
+                    columns: 1
+                }
+            ],
+            button_label: "End survey"
+        };
+
+        var timeline = []; //Keep this
+        timeline.push(survey_block); //Replace survey_block with your experiment blocks
+
+
+        //------------------- Your code above this line -------------------
+
+        //If we're launching this online, we add in the consent form and the link to redirect them to Prolific's submission link
+        if(launchOnline){
+        	timeline.unshift(createConsentFormBlock());
+          timeline.push(createProlificRedirectBlock());
+    	  }
+
+        //Initiate the experiment
+        jsPsych.init({
+            timeline: timeline,
+            on_finish: function(){ //Execute this when the experiment finishes
+                if(saveLocally == true){
+                    jsPsych.data.get().localSave('csv','testSave.csv'); //Save the data locally in a .csv file
+                }
+                if(displayData == true){
+                    jsPsych.data.displayData(); //Display the data onto the browser screen
+                }
+            },
+            on_trial_finish: function(){ //Execute this after every trial
+                if (launchOnline == true){
+                    save_data(tableName, [jsPsych.data.get().last(1).values()[0]]);
+                }
+            }
+        });
+
+
+        //=======================================
+        //========= BUILT-IN FUNCTIONS ==========
+        //=======================================
+
+
+        //-------- Trial-Making --------
+
+        // Creates a consent form trial and returns it
+        function createConsentFormBlock(){
+
+	        return {
+	          type:'external-html',
+	          url: consentForm,
+	          cont_btn: "startExperimentButton",
+	          check_fn: check_consent
+	        };
+        }
+
+        // Creates the link at the end to allow the participant to submit on Prolific
+        function createProlificRedirectBlock(){
+          var message = "<p> Thank you for participating in our experiment! </p>" +
+                        "<p> <a href='https://app.prolific.co/submissions/complete?cc=" + completionCode + "'>Please click here to end the experiment.</a> </p>"
+          return{
+            type: 'call-function',
+            func: function(){
+              //End the experiment and display the message
+              jsPsych.endExperiment(message);
+            }
+          }
+        }
+
+        //-------- Utilities --------
+
+        //A function to save the data to the SQL table on the server.  This gets called at the end of the file.
+        function save_data(data_table,data){
+
+            //Add data to the jsPsych data file
+            jsPsych.data.addProperties({
+                PROLIFIC_PID: PROLIFIC_PID,
+                STUDY_ID: STUDY_ID,
+                SESSION_ID: SESSION_ID,
+                INTERNAL_ID: INTERNAL_ID
+            });
+
+            //Use AJAX to post the data onto the server
+            $.ajax({
+                type:'post',
+                cache: false,
+                url: 'savedata.php',
+                data: {
+                    table: data_table,
+                    json: JSON.stringify(data),
+                },
+                success: function(output) {
+                  console.log(output); // Write the result to browser console
+                }
+            });
+        }
+
+        // Check if the subject has given consent
+        function check_consent(elem) {
+          if ($('#consent_checkbox').is(':checked')) {
+            return true;
+          }
+          else {
+            alert("If you wish to participate, you must check the box next to the statement 'I agree to participate in this study.'");
+            return false;
+          }
+        };
+
+
+  </script>
+  </html>
