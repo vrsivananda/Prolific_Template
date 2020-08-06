@@ -35,7 +35,7 @@ path='subjects.txt';
 % Make an ID for the subject list file
 subjectListFileId=fopen(path);
 % Read in the number from the subject list
-numberOfSubjects = fscanf(subjectListFileId,'%d');
+numberOfSubjects = fscanf(subjectListFileId,'%d',1);
 disp('Number of subjects: ');
 disp(numberOfSubjects); 
 
