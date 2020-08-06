@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+  <head>
+      <title>Compensation</title>
+
+      <!--These are necessary for the template to work-->
+      <meta charset="UTF-8">
+      <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+      <link href="jspsych-6.0.5/css/jspsych.css" rel="stylesheet" type="text/css"></link>
+      <script src="jspsych-6.0.5/jspsych.js"></script>
+      <script src="jspsych-6.0.5/plugins/jspsych-call-function.js"></script>
+
+  </head>
+  <body>
+  </body>
+  <script>
+
+        //Data switches
+        var saveLocally = 0;	// 0: Nothing.	1: Download CSV file
+        var displayData = 0;  // 0: Nothing.	1: Display data on browser
+        var launchOnline = 1;	// 0: Nothing.	1: Save to database, create consent form, completion code for Prolific
+        var tableName = 'Prolific_Testing'; //Name of the table in the database
+        var completionCode = "352206BD"; //Update this
+
+        //Get the IDs from the url
+        const urlParams = new URLSearchParams(window.location.search);
+        const PROLIFIC_PID = urlParams.get('PROLIFIC_PID');
+        const STUDY_ID = urlParams.get('STUDY_ID');
+        const SESSION_ID = urlParams.get('SESSION_ID');
+        const INTERNAL_ID = Date.now(); //This is just in case the above fails and/or we want to remove the Prolific IDs if we share the data
+
+        //Print out to console to check
+        console.log("PROLIFIC_PID: " + PROLIFIC_PID);
+        console.log("STUDY_ID: " + STUDY_ID);
+        console.log("SESSION_ID: " + SESSION_ID);
+        console.log("INTERNAL_ID: " + INTERNAL_ID);
+
+        var timeline = [createProlificRedirectBlock()];
+
+        //Initiate the experiment
+        jsPsych.init({
+            timeline: timeline,
+            on_finish: function(){ //Execute this when the experiment finishes
+                if(saveLocally == true){
+                    jsPsych.data.get().localSave('csv','testSave.csv'); //Save the data locally in a .csv file
+                }
+                if(displayData == true){
+                    jsPsych.data.displayData(); //Display the data onto the browser screen
+                }
+            },
+            on_trial_finish: function(){ //Execute this after every trial
+                if (launchOnline == true){
+                    save_data(tableName, [jsPsych.data.get().last(1).values()[0]]);
+                }
+            }
+        });
+
+
+        //=======================================
+        //========= BUILT-IN FUNCTIONS ==========
+        //=======================================
+
+        // Creates the link at the end to allow the participant to submit on Prolific
+        function createProlificRedirectBlock(){
+          var message = "<p> Thank you for participating in our experiment! </p>" +
+                        "<p> <a href='https://app.prolific.co/submissions/complete?cc=" + completionCode + "'>Please click here to end the experiment.</a> </p>"
+          return{
+            type: 'call-function',
+            func: function(){
+              //End the experiment and display the message
+              jsPsych.endExperiment(message);
+            }
+          }
+        }
+
+        //-------- Utilities --------
+
+        //A function to save the data to the SQL table on the server.  This gets called at the end of the file.
+        function save_data(data_table,data){
+
+            //Add data to the jsPsych data file
+            jsPsych.data.addProperties({
+                PROLIFIC_PID: PROLIFIC_PID,
+                STUDY_ID: STUDY_ID,
+                SESSION_ID: SESSION_ID,
+                INTERNAL_ID: INTERNAL_ID
+            });
+
+            //Use AJAX to post the data onto the server
+            $.ajax({
+                type:'post',
+                cache: false,
+                url: 'savedata.php',
+                data: {
+                    table: data_table,
+                    json: JSON.stringify(data),
+                },
+                success: function(output) {
+                  console.log(output); // Write the result to browser console
+                }
+            });
+        }
+
+
+  </script>
+  </html>
